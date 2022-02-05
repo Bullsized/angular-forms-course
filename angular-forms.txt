@@ -1,0 +1,430 @@
+npm start
+npm run server
+
+
+
+app.modules.ts:
+FormsModule         -> adds the capability of Template driven forms
+ReactiveFormsModule -> adds the capability of Reactive driven forms
+
+
+
+LINKS:
+Angular Material: https://material.angular.io/components/form-field/overview
+Original repo: https://github.com/angular-university/angular-forms-course
+:LINKS
+
+
+
+TEMPLATE DRIVEN FORMS:
+The way they work is applying a directive to the form element.
+It has a coordination role - gathering and validating data, etc.
+It is applied only in the .html file - you do not have to write
+anything in the .ts file - that's why it's called Template forms.
+Declaration is only on template level.
+
+It uses FormsModule.
+
+<form class="login-form" #loginForm="ngForm"></form>
+
+#loginForm (a template variable) grabs the value exported by the 
+form and it becomes a variable that can be used in the template:
+<button (click)="console.log(loginForm.value)"></button>
+
+loginForm is of NgForm type.
+
+We need to tell the ngForm which are the controls, so add `ngModel`:
+<input ngModel type="email" name="email" placeholder="Email">
+
+It is important that all inputs have a name="" field.
+
+Validations (client side, aka in the Browser):
+`required` attribute for required
+`minlength="3"`
+`maxlength="20"`
+`email` attribute fo email
+`pattern="[a-z]+"`
+
+States:
+touched 
+dirty
+validity
+input.ng-invalid.ng-touched {}
+
+*ngIf="emails.errors?.required" <- check if the errors of emails that
+are required is truthy
+*ngIf="emails.errors?.minlength" <- check if min length is appliant
+
+ngSubmit:
+<form class="login-form" #loginForm="ngForm" (ngSubmit)="login(loginForm, $event)"></form>
+
+to make the submit button disabled when a form is not valid:
+<button type="submit" [disabled]="!loginForm.valid"></button>
+add a type="submit" to the button!
+
+ngModelChange:
+<input ngModel (ngModelChange)="onEmailChange($event)" name="email">
+each time a change is applied you can see the new value
+
+emit a new value only on occasions:
+<input ngModel [ngModelOptions]="{ updateOn: 'blur' }"
+    (ngModelChange)="onEmailChange($event)" name="email">
+updatedOn can be 'change', 'submit'
+
+[ngModelOptions]="{ name: 'email' }" <- useful for dynamic forms that 
+add or remove items - to set the name of the form control
+
+[ngModelOptions]="{ standalone: true }" <- it allows us to have a form
+control in a stand alone form, disconnected from the parent ngForm
+
+if you want to prefill a value from the TS:
+create an Obj, let's say:
+val = { email: "a@a.com" }
+and then in the template:
+<input name="email" [ngModel]="val.email">
+
+and if you want this ^ to be two way binded, do the following:
+<input name="email" [(ngModel)]="val.email"> <- that way when
+you type something in the input, it will be then stored in the 
+val variable. 
+
+and if you want to add a custom Pass Strength validator directive:
+<input name="password" required passwordStrength>
+then create a password-strength.validator.ts file 
+which will contain the validator function:
+
+import { ValidatorFn } from '@angular/forms';
+
+export function createPasswordStrengthValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+        const value = control.value;
+
+        if (!value) {
+            return null; // no errors were found
+        }
+
+        const hasUpperCase = /[A-Z]+/.test(value);
+
+        const hasLowerCase = /[a-z]+/.test(value);
+
+        const hasNumeric = /[0-9]+/.test(value);
+
+        const passwordValid = hasUpperCase && hasLowerCase && hasNumeric;
+
+        return !passwordValid ? { passwordStrength: true } : null;
+    }
+}
+
+then create a new directive (password-strength.directive.ts) and in it:
+
+import { Directive } from '@angular/core';
+import { Validator } from '@angular/forms';
+
+@Directive({
+    selector: "[passwordStrength]",
+    providers: [{
+        provide: NG_VALIDATORS, <- notify Angular that we're adding a new validator directive
+        useExisting: PasswordStrengthDirective,
+        multi: true
+    }]
+})
+export class PasswordStrengthDirective implements Validator {
+    validate(control: AbstractControl): ValidationErrors | null {
+        return createPasswordStrengthValidator()(control);
+    }
+}
+
+After that add the directive in the declarations array of the app module file.
+
+Multiple error messages per form field - you can create a custom pipe (onlyOneError) 
+to display to the user only one error message.
+
+<ng-container *ngIf="password.errors | onlyOneError: ['minlength', 'passwordStrength'] 
+                                        as error">
+    and put the validators here:
+    <mat-error *ngIf="error.minlength">
+        Error message for minimum length.
+    </mat-error>                                        
+
+</ng-container>
+
+then create your pipe: /app/pipes/only-one-error.pipe.ts
+
+@Pipe({
+    name: 'onlyOneError'
+})
+export class OnlyOneErrorPipe implements PipeTransform {
+    transform(allErrors: any, errorsPriority: string[]): any {
+        if (!allErrors) {
+            return null;
+        }
+
+        const onlyOneError: any = {};
+
+        for (let error of errorsPriority) {
+            if (allErrors[error]) {
+                onlyOneError[error] = allErrors[error];
+                break;
+            }
+        }
+
+        return onlyOneError;
+    }
+}
+
+add the pipe to the app.module.ts in the declarations.
+:TEMPLATE DRIVEN FORMS
+
+
+REACTIVE FORMS:
+You need to add the ReactiveFormsModule in the app.module.ts
+Added at the level of the component:
+
+form: FormGroup = new FormGroup({
+    email: new FormControl('', {validators: [Validators.required, Validators.email]}),
+    password: new FormControl('', {validators: [Validators.required, Validators.minLength(8)]})
+});
+
+and then attach it to the form in the template:
+<form [formGroup]="form"></form>
+
+and after that in the input link the form control:
+<input name="email" formControlName="email">
+
+All of the model of the form is defined in an explicit programmatic way at 
+the level of the component. Reactive forms scale better in complexity.
+
+ALTERNATIVE WAY OF CONFIGURING THE REACTIVE FORMS
+You can set the form controls as different variables and then add them to the form group:
+email = new FormControl('', {validators: [Validators.required, Validators.email]}),
+
+form = new FormGroup({
+    email: this.email
+})
+
+But this way you should mark it up in the templating:
+<input name="email" [formControl]="email">
+ALTERNATIVE WAY OF CONFIGURING THE REACTIVE FORMS
+
+TO UPDATE ON BLUR:
+email = new FormControl('', {
+    validators: [Validators.required, Validators.email],
+    updateOn: 'blur'
+});
+
+Adding validators is as simple as inserting in the validators array:
+email = new FormControl('', {
+    validators: [Validators.required, Validators.email, createPasswordStrengthValidator()
+]}),
+
+ALTERNATIVE WAY OF DEFINING FORMS - FORM BUILDER API:
+use form builder service:
+constructor(private fb: FormBuilder) {}
+
+form = this.fb.group({
+    email: ['', {
+        valodators: [Validators.required],
+        updateOn: 'blur',
+    }],
+    password: ['', [Validators.required, Validators.minLength(8)]]
+});
+
+after that change the inputs to:
+<input name="email" formControlName="email">
+
+CREATING A CUSTOM ASYNC VALIDATOR:
+export function courseTitleValidator(courses: CoursesService): AsyncValidatorFn  {
+    return (control: AbstractControl) => {
+        return courses.findAllCourses()
+            .pipe(
+                map(courses => {
+                    const course = courses.find(
+                        course => course.description.toLowerCase()
+                            == control.value.toLowerCase() );
+
+                    return course ? {titleExists:true} : null;
+                })
+            )
+    }
+}
+
+and then using it:
+form = this.fb.group({
+    title: ['', {
+        validators: [
+            Validators.required,
+            Validators.minLength(5),
+            Validators.maxLength(60)
+        ],
+        asyncValidators: [courseTitleValidator(this.courses)],
+        updateOn: 'blur'
+    }],
+});
+
+Validator for a numeric field:
+form = this.fb.group({
+    price: [null, [
+        Validators.required,
+        Validators.min(1),
+        Validators.max(9999),
+        Validators.pattern("[0-9]+") <- to be a number
+    ]]
+})
+
+and for the input:
+<input type="number" placeholder="Price" formControlName="price">
+
+In order to enable/disable one form control based on the state of another:
+ngOnInit() {
+    this.form.valueChanges
+        .subscribe(val => {
+            const priceControl = this.form.controls['price'];
+
+            if(val.courseType === 'free' && priceControl.enabled) {
+                priceControl.disable({ emitEvent: false }) // so that it's not
+                                    // emitting the value changes again
+            } else if (val.courseType === 'premium' && priceControl.disabled) {
+                priceControl.enable({ emitEvent: false })
+            }
+        });
+}
+
+To add a custom validator:
+form = this.fb.group({
+    promoStartAt: [null],
+    promoEndAt: [null]
+}, {
+    validators: [createPromoRangeValidator()] // add it in a second configuration object
+});
+
+and that validator must be created like this:
+export function createPromoRangeValidator(): ValidatorFn {
+    return (form: FormGroup): Validators | null => {
+        const start: Date = form.get('promoStartAt').value;
+
+        const end:Date = form.get('promoEndAt').value;
+
+        if (start && end) {
+            const isRangeValid = (end.getTime() - start.getTime() > 0);
+
+            return isRangeValid ? null : { promoPeriod: true };
+        }
+
+        return null;
+    }
+}
+
+how to save form values if user navigates away from the form (locally in the browser):
+ngOnInit() {
+    // check if there already is a draft saved and set it to the form values:
+    const draft = localStorage.getItem("STEP_1");
+
+    if (draft) {
+        this.form.setValue(JSON.parse(draft));
+    }
+
+    // check for valid form fields and if there are any - save them to a "STEP_1" draft 
+    // local storage file:
+    this.form.valueChanges
+        .pipe(
+            filter(() => this.form.valid)
+        )
+        .subscribe( val => localStorage.setItem("STEP_1", JSON.stringify(val)));
+}
+
+ControlValueAccessor - interface that has 4 methods in it and they are triggered
+only by Angular. We do not have to call them ourselves. It is implemented by the 
+components. This is lesson 43.
+Every form control have built in control value accessor interface, which is a 
+part of the Angular forms module. You do not have to write them yourself.
+They are there, working under the hood.
+If we want to take a custom component and have it integrate well with the Angular 
+forms library, we need to have it implement the control value accessor interface.
+This is what is going to allow us to apply the Form Control Directive into that
+component or even use the ngModel directive.
+
+export class FileUploadComponent implements ControlValueAccessor {
+    fileName = '';
+    
+    onChange = (fileName: string) => {}; // empty function that has an empty function body
+
+    onTouched = () => {};
+
+    disabled = false;
+    
+    writeValue(value: any) {
+        this.fileName = value;
+    }
+
+    registerOnChange(onChange: any) {
+        this.onChange = onChange;
+    }
+
+    registerOnTouched(onTouched: any) {
+        this.onTouched = onTouched;
+    }
+
+    setDisabledState(disabled: boolean) {
+        this.disabled = disabled;
+    }
+}
+
+Besides implementing the ControlValueAccessor, we also need to register the component 
+in the Angular dependency injection properly (basically tell Angular that this component
+is a form control and can participate in a form). This is done by declaring a provider:
+
+@Component({
+  selector: 'file-upload',
+  templateUrl: "file-upload.component.html",
+  styleUrls: ["file-upload.component.scss"],
+  providers: [
+      {
+          provide: NG_VALUE_ACCESSOR, // injection token (unique injection key)
+          multi: true, // many value accessor, or we overwrite them - and it's a mistake
+          useExisting: FileUploadComponent // passing a reference to our component
+      }
+  ]
+})
+
+
+VALIDATOR INTERFACE:
+export class FileUploadComponent implements ControlValueAccessor, Validator {
+    // from angular forms
+
+it needs 2 functions to exist:
+validate(control: AbstractControl): ValidationErrors | null {}
+and
+registerOnValidatorChange(onValidatorChange: () => void) {}
+
+and it also must be provided to the component:
+providers: [
+      {
+          provide: NG_VALIDATORS,
+          multi: true,
+          useExisting: FileUploadComponent
+      }
+]
+
+By doing so the component is fully compatible with template driven and reactive 
+forms, it can receive and set new values of a parent form via ControlValueAccessor
+and participate in the validity state of the form via the Validator interface.
+
+NESTED REUSABLE FORM:
+Check the address form component - it contains another example of ControlValueAccessor.
+
+FORM ARRAYS:
+Different than form control:
+form = this.fb.group({
+    lessons: this.fb.array([])
+});
+
+It's dynamic, so you can add/remove controls. You have to use the formArrayName in 
+order for it to work:
+<ng-container formArrayName="lessons"></ng-container>
+
+:REACTIVE FORMS
+
+remarks for Vasco:
+a lot ot angular material knowledge is required
+writing code - use full screen
+do not set any (end of template driven) - add the correct type
